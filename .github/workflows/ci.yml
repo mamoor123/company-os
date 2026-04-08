@@ -1,0 +1,109 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test-sqlite:
+    name: Test (SQLite)
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node-version: [18, 20, 22]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Use Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: npm
+          cache-dependency-path: server/package-lock.json
+
+      - name: Install dependencies
+        working-directory: server
+        run: npm ci
+
+      - name: Run tests
+        working-directory: server
+        run: npm test
+        env:
+          JWT_SECRET: ci-test-secret-${{ github.run_id }}
+          NODE_ENV: test
+
+  test-postgres:
+    name: Test (PostgreSQL)
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: test
+          POSTGRES_PASSWORD: test
+          POSTGRES_DB: company_os_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Use Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: server/package-lock.json
+
+      - name: Install dependencies
+        working-directory: server
+        run: npm ci
+
+      - name: Run migrations (PostgreSQL)
+        working-directory: server
+        run: npm run migrate
+        env:
+          DATABASE_URL: postgres://test:test@localhost:5432/company_os_test
+          JWT_SECRET: ci-test-secret-pg
+
+      - name: Run tests
+        working-directory: server
+        run: npm test
+        env:
+          DATABASE_URL: postgres://test:test@localhost:5432/company_os_test
+          JWT_SECRET: ci-test-secret-pg
+          NODE_ENV: test
+
+  lint:
+    name: Lint & Security
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Use Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: server/package-lock.json
+
+      - name: Install dependencies
+        working-directory: server
+        run: npm ci
+
+      - name: Audit dependencies
+        working-directory: server
+        run: npm audit --production || true
+        continue-on-error: true
+
+      - name: Check for outdated deps
+        working-directory: server
+        run: npm outdated || true
+        continue-on-error: true

@@ -4,28 +4,28 @@ const helmet = require('helmet');
 const http = require('http');
 const { Server } = require('socket.io');
 const jwt = require('jsonwebtoken');
+const log = require('./config/logger');
 const db = require('./config/db');
 const { JWT_SECRET } = require('./middleware/auth');
 const { chatWithAgent } = require('./services/ai-engine');
 const notificationService = require('./services/notifications');
 
 // ─── Run migrations on startup ───────────────────────────────────
-
-const { execSync } = require('child_process');
-const path = require('path');
+const { runMigrations } = require('./config/migrate');
 try {
-  console.log('📦 Running database migrations...');
-  execSync(`node ${path.join(__dirname, 'config/migrate.js')}`, {
-    stdio: 'inherit',
-    env: { ...process.env },
-  });
+  log.info('📦 Running database migrations...');
+  // Use sync for SQLite, async for PG — handle both
+  const migrationResult = runMigrations();
+  if (migrationResult && typeof migrationResult.then === 'function') {
+    // PG mode: we need to handle async startup
+    // This is handled below in the async startup function
+  }
 } catch (err) {
-  console.error('❌ Migration failed:', err.message);
+  log.error({ err }, '❌ Migration failed');
   process.exit(1);
 }
 
 // ─── Express + Socket.IO setup ───────────────────────────────────
-
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server, {
@@ -41,19 +41,17 @@ app.use(helmet({ contentSecurityPolicy: false }));
 app.use(cors({ origin: process.env.CORS_ORIGIN || 'http://localhost:3000' }));
 app.use(express.json({ limit: '1mb' }));
 
-// Request logging (dev)
-if (process.env.NODE_ENV !== 'production') {
-  app.use((req, res, next) => {
-    const start = Date.now();
-    res.on('finish', () => {
-      const ms = Date.now() - start;
-      if (req.path !== '/api/health') {
-        console.log(`${req.method} ${req.path} ${res.statusCode} ${ms}ms`);
-      }
-    });
-    next();
+// Request logging
+app.use((req, res, next) => {
+  const start = Date.now();
+  res.on('finish', () => {
+    const ms = Date.now() - start;
+    if (req.path !== '/api/health') {
+      log.info({ method: req.method, path: req.path, status: res.statusCode, ms }, `${req.method} ${req.path} ${res.statusCode} ${ms}ms`);
+    }
   });
-}
+  next();
+});
 
 // Routes
 app.use('/api/auth', require('./routes/auth'));
@@ -70,10 +68,10 @@ app.use('/api/uploads', require('./routes/uploads'));
 app.use('/api/system', require('./routes/system'));
 
 // Health check with DB connectivity
-app.get('/api/health', (req, res) => {
+app.get('/api/health', async (req, res) => {
   try {
-    db.prepare('SELECT 1').get();
-    res.json({ status: 'ok', time: new Date().toISOString(), db: 'connected' });
+    const healthy = await db.healthCheck();
+    res.json({ status: 'ok', time: new Date().toISOString(), db: healthy ? db._type : 'error' });
   } catch (err) {
     res.status(503).json({ status: 'error', db: 'disconnected', error: err.message });
   }
@@ -81,115 +79,52 @@ app.get('/api/health', (req, res) => {
 
 // Global error handler
 app.use((err, req, res, next) => {
-  console.error('Unhandled error:', err.message);
-  if (process.env.NODE_ENV !== 'production') {
-    console.error(err.stack);
-  }
-
-  // Multer errors
-  if (err.code === 'LIMIT_FILE_SIZE') {
-    return res.status(413).json({ error: 'File too large (max 10MB)' });
-  }
-
+  log.error({ err, path: req.path }, 'Unhandled error');
+  if (err.code === 'LIMIT_FILE_SIZE') return res.status(413).json({ error: 'File too large (max 10MB)' });
   res.status(500).json({ error: 'Internal server error' });
 });
 
 // ─── Socket.IO ───────────────────────────────────────────────────
-
 io.use((socket, next) => {
   const token = socket.handshake.auth.token;
   if (!token) return next(new Error('Authentication required'));
-  try {
-    socket.user = jwt.verify(token, JWT_SECRET);
-    next();
-  } catch (err) {
-    next(new Error('Invalid token'));
-  }
+  try { socket.user = jwt.verify(token, JWT_SECRET); next(); } catch { next(new Error('Invalid token')); }
 });
 
 io.on('connection', (socket) => {
-  console.log(`⚡ User connected: ${socket.user.name}`);
-
+  log.info({ user: socket.user.name }, '⚡ User connected');
   socket.join(`user:${socket.user.id}`);
 
-  socket.on('join-channel', (channel) => {
-    socket.join(channel);
-  });
+  socket.on('join-channel', (channel) => socket.join(channel));
+  socket.on('leave-channel', (channel) => socket.leave(channel));
 
-  socket.on('leave-channel', (channel) => {
-    socket.leave(channel);
-  });
-
-  socket.on('message', (data) => {
+  socket.on('message', async (data) => {
     const { channel, content } = data;
     if (!channel || !content) return;
-
-    const result = db.prepare(
-      'INSERT INTO messages (channel, sender_type, sender_id, content) VALUES (?, ?, ?, ?)'
-    ).run(channel, 'user', socket.user.id, content);
-
-    const message = {
-      id: result.lastInsertRowid,
-      channel,
-      sender_type: 'user',
-      sender_id: socket.user.id,
-      sender_name: socket.user.name,
-      content,
-      created_at: new Date().toISOString(),
-    };
-
-    io.to(channel).emit('message', message);
+    const result = await db.prepare('INSERT INTO messages (channel, sender_type, sender_id, content) VALUES (?, ?, ?, ?)').run(channel, 'user', socket.user.id, content);
+    io.to(channel).emit('message', { id: result.lastInsertRowid, channel, sender_type: 'user', sender_id: socket.user.id, sender_name: socket.user.name, content, created_at: new Date().toISOString() });
   });
 
   socket.on('agent-message', async (data) => {
     const { channel, agentId, content } = data;
     if (!channel || !agentId || !content) return;
-
-    const userMsg = db.prepare(
-      "INSERT INTO messages (channel, sender_type, sender_id, content) VALUES (?, 'user', ?, ?)"
-    ).run(channel, socket.user.id, content);
-
-    io.to(channel).emit('message', {
-      id: userMsg.lastInsertRowid,
-      channel,
-      sender_type: 'user',
-      sender_id: socket.user.id,
-      sender_name: socket.user.name,
-      content,
-      created_at: new Date().toISOString(),
-    });
-
+    const userMsg = await db.prepare("INSERT INTO messages (channel, sender_type, sender_id, content) VALUES (?, 'user', ?, ?)").run(channel, socket.user.id, content);
+    io.to(channel).emit('message', { id: userMsg.lastInsertRowid, channel, sender_type: 'user', sender_id: socket.user.id, sender_name: socket.user.name, content, created_at: new Date().toISOString() });
     io.to(channel).emit('agent-typing', { agentId, channel });
-
     try {
       const response = await chatWithAgent(agentId, content, channel);
-      const agent = db.prepare('SELECT name FROM agents WHERE id = ?').get(agentId);
-
-      io.to(channel).emit('message', {
-        id: Date.now(),
-        channel,
-        sender_type: 'agent',
-        sender_id: agentId,
-        sender_name: agent?.name || 'Agent',
-        content: response,
-        created_at: new Date().toISOString(),
-      });
-    } catch (err) {
-      io.to(socket.id).emit('error', { message: err.message });
-    }
-
+      const agent = await db.prepare('SELECT name FROM agents WHERE id = ?').get(agentId);
+      io.to(channel).emit('message', { id: Date.now(), channel, sender_type: 'agent', sender_id: agentId, sender_name: agent?.name || 'Agent', content: response, created_at: new Date().toISOString() });
+    } catch (err) { io.to(socket.id).emit('error', { message: err.message }); }
     io.to(channel).emit('agent-stop-typing', { agentId, channel });
   });
 
-  socket.on('disconnect', () => {
-    console.log(`💤 User disconnected: ${socket.user.name}`);
-  });
+  socket.on('disconnect', () => log.info({ user: socket.user.name }, '💤 User disconnected'));
 });
 
 // ─── Seed defaults ───────────────────────────────────────────────
-
-function seedDefaults() {
-  const deptCount = db.prepare('SELECT COUNT(*) as count FROM departments').get().count;
+async function seedDefaults() {
+  const deptCount = (await db.prepare('SELECT COUNT(*) as count FROM departments').get()).count;
   if (deptCount === 0) {
     const defaults = [
       { name: 'Operations', description: 'Day-to-day business operations', icon: '⚙️', color: '#6366f1' },
@@ -199,90 +134,56 @@ function seedDefaults() {
       { name: 'HR & Admin', description: 'People operations and administration', icon: '👥', color: '#8b5cf6' },
       { name: 'Design', description: 'Creative and visual design', icon: '🎨', color: '#ef4444' },
     ];
-
-    const insert = db.prepare('INSERT INTO departments (name, description, icon, color) VALUES (?, ?, ?, ?)');
-    for (const d of defaults) {
-      insert.run(d.name, d.description, d.icon, d.color);
-    }
-    console.log('✅ Seeded default departments');
+    for (const d of defaults) await db.prepare('INSERT INTO departments (name, description, icon, color) VALUES (?, ?, ?, ?)').run(d.name, d.description, d.icon, d.color);
+    log.info('✅ Seeded default departments');
   }
 }
-
-seedDefaults();
 
 // Initialize notification service with Socket.IO
 notificationService.setIO(io);
 
 // ─── Background services ─────────────────────────────────────────
-
 const executionLoop = require('./services/execution-loop');
 const scheduler = require('./services/scheduler');
 const emailReal = require('./services/email-real');
 
-server.listen(PORT, () => {
-  console.log(`
-  ╔══════════════════════════════════════╗
-  ║     🏢 Company OS Server v0.3.0     ║
-  ║     Running on port ${PORT}            ║
-  ╚══════════════════════════════════════╝
-  `);
+// ─── Async startup (handles PG migrations) ───────────────────────
+async function startup() {
+  // Wait for async migrations if PG
+  if (db._type === 'pg') {
+    try { await runMigrations(); } catch (err) { log.error({ err }, '❌ PG migration failed'); process.exit(1); }
+  }
 
-  executionLoop.start();
-  scheduler.start();
-  emailReal.startImapPolling();
-});
+  await seedDefaults();
+
+  server.listen(PORT, () => {
+    log.info(`🏢 Company OS Server v0.4.0 — port ${PORT} — ${db._type} mode`);
+    executionLoop.start();
+    scheduler.start();
+    emailReal.startImapPolling();
+  });
+}
+
+startup();
 
 // ─── Graceful shutdown ───────────────────────────────────────────
-
 let isShuttingDown = false;
 
 function gracefulShutdown(signal) {
   if (isShuttingDown) return;
   isShuttingDown = true;
-
-  console.log(`\n🛑 ${signal} received, shutting down gracefully...`);
-
-  // Stop accepting new connections
-  server.close(() => {
-    console.log('  ✓ HTTP server closed');
-  });
-
-  // Stop background services
+  log.info({ signal }, '🛑 Shutting down...');
+  server.close(() => log.info('✓ HTTP server closed'));
   executionLoop.stop();
-  console.log('  ✓ Execution loop stopped');
-
   scheduler.stop();
-  console.log('  ✓ Scheduler stopped');
-
   emailReal.stopImapPolling();
-  console.log('  ✓ IMAP polling stopped');
-
-  // Close Socket.IO
-  io.close(() => {
-    console.log('  ✓ Socket.IO closed');
-  });
-
-  // Close database
-  try {
-    db.close();
-    console.log('  ✓ Database closed');
-  } catch (err) {
-    console.error('  ✗ Database close error:', err.message);
-  }
-
-  console.log('👋 Shutdown complete');
+  io.close(() => log.info('✓ Socket.IO closed'));
+  db.close();
+  log.info('👋 Shutdown complete');
   process.exit(0);
 }
 
 process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
 process.on('SIGINT', () => gracefulShutdown('SIGINT'));
-
-process.on('unhandledRejection', (reason, promise) => {
-  console.error('Unhandled Rejection:', reason);
-  // Don't exit — log and continue
-});
-
-process.on('uncaughtException', (err) => {
-  console.error('Uncaught Exception:', err);
-  gracefulShutdown('uncaughtException');
-});
+process.on('unhandledRejection', (reason) => log.error({ reason }, 'Unhandled Rejection'));
+process.on('uncaughtException', (err) => { log.error({ err }, 'Uncaught Exception'); gracefulShutdown('uncaughtException'); });

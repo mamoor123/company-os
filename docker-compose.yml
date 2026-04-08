@@ -1,6 +1,23 @@
 version: "3.8"
 
 services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-companyos}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: ${POSTGRES_DB:-companyos}
+    ports:
+      - "5432:5432"
+    volumes:
+      - pg-data:/var/lib/postgresql/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-companyos}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   server:
     build: ./server
     ports:
@@ -9,8 +26,10 @@ services:
       - NODE_ENV=production
       - JWT_SECRET=${JWT_SECRET:?Set JWT_SECRET in .env before running}
       - CORS_ORIGIN=${CORS_ORIGIN:-http://localhost:3000}
-      - DB_PATH=/data/company-os.db
       - PORT=3001
+      # PostgreSQL (preferred for production)
+      - DATABASE_URL=postgres://${POSTGRES_USER:-companyos}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-companyos}
+      # LLM
       - LLM_API_URL=${LLM_API_URL:-https://api.openai.com/v1/chat/completions}
       - LLM_API_KEY=${LLM_API_KEY:-}
       - DEFAULT_MODEL=${DEFAULT_MODEL:-gpt-4}
@@ -28,16 +47,20 @@ services:
       - IMAP_USER=${IMAP_USER:-}
       - IMAP_PASS=${IMAP_PASS:-}
       - IMAP_POLL_INTERVAL_MS=${IMAP_POLL_INTERVAL_MS:-60000}
+      # Logging
+      - LOG_LEVEL=${LOG_LEVEL:-info}
     volumes:
-      - db-data:/data
       - upload-data:/app/data/uploads
+    depends_on:
+      postgres:
+        condition: service_healthy
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "node", "-e", "fetch('http://localhost:3001/api/health').then(r=>process.exit(r.ok?0:1))"]
       interval: 30s
       timeout: 5s
       retries: 3
-      start_period: 10s
+      start_period: 15s
 
   web:
     build: ./web
@@ -51,5 +74,5 @@ services:
     restart: unless-stopped
 
 volumes:
-  db-data:
+  pg-data:
   upload-data:

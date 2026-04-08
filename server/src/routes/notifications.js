@@ -4,28 +4,22 @@ const notificationService = require('../services/notifications');
 
 const router = express.Router();
 
-// Get notifications
-router.get('/', authMiddleware, (req, res) => {
-  const unreadOnly = req.query.unread === 'true';
-  const limit = parseInt(req.query.limit) || 50;
-  const notifications = notificationService.getNotifications(req.user.id, { unreadOnly, limit });
-  res.json(notifications);
+router.get('/', authMiddleware, async (req, res) => {
+  const { unread } = req.query;
+  res.json(await notificationService.getNotifications(req.user.id, { unreadOnly: unread === 'true' }));
 });
 
-// Get unread count
-router.get('/unread-count', authMiddleware, (req, res) => {
-  res.json({ count: notificationService.getUnreadCount(req.user.id) });
+router.get('/unread-count', authMiddleware, async (req, res) => {
+  res.json({ count: await notificationService.getUnreadCount(req.user.id) });
 });
 
-// Mark single as read
-router.post('/:id/read', authMiddleware, (req, res) => {
-  notificationService.markRead(req.params.id, req.user.id);
+router.post('/:id/read', authMiddleware, async (req, res) => {
+  await notificationService.markRead(req.params.id, req.user.id);
   res.json({ success: true });
 });
 
-// Mark all as read
-router.post('/read-all', authMiddleware, (req, res) => {
-  notificationService.markAllRead(req.user.id);
+router.post('/read-all', authMiddleware, async (req, res) => {
+  await notificationService.markAllRead(req.user.id);
   res.json({ success: true });
 });
 
