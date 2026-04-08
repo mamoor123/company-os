@@ -158,7 +158,7 @@ I've reviewed your message and would be happy to discuss this further. Let me ch
 ${instructions ? `Note: ${instructions}\n\n` : ''}Please let me know if you need anything else in the meantime.
 
 Best regards,
-Company OS Assistant`;
+HiveOps Assistant`;
 }
 
 module.exports = {

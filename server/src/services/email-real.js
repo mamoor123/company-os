@@ -103,7 +103,7 @@ async function sendEmail({ to, subject, body, inReplyTo, userId }) {
   const transport = getSmtpTransport();
   let realSent = false, realError = null;
   if (transport) {
-    try { await transport.sendMail({ from: process.env.SMTP_FROM || 'no-reply@company-os.local', to, subject, text: body || '' }); realSent = true; console.log(`📧 Sent via SMTP: ${subject} → ${to}`); }
+    try { await transport.sendMail({ from: process.env.SMTP_FROM || 'no-reply@hiveops.local', to, subject, text: body || '' }); realSent = true; console.log(`📧 Sent via SMTP: ${subject} → ${to}`); }
     catch (err) { realError = err.message; console.error(`📧 SMTP send failed, saving to DB only: ${err.message}`); }
   }
   const result = await db.prepare("INSERT INTO emails (from_addr, to_addr, subject, body, folder, read, starred, in_reply_to, user_id) VALUES (?, ?, ?, ?, 'sent', 1, 0, ?, ?)").run(process.env.SMTP_FROM || 'admin@company-os.local', to, subject, body || '', inReplyTo || null, userId || null);
@@ -136,7 +136,7 @@ async function generateReply(emailId, instructions = '') {
     const { callLLM } = require('./ai-engine');
     return callLLM(`You are a professional email assistant. Draft a concise, helpful reply. ${instructions ? `Additional instructions: ${instructions}` : ''}`, `Original email from ${email.from}:\nSubject: ${email.subject}\n\n${email.body}\n\nDraft a reply.`);
   }
-  return `Hi,\n\nThank you for your email regarding "${email.subject}".\n\nI've reviewed your message and would be happy to discuss this further.\n\n${instructions ? `Note: ${instructions}\n\n` : ''}Best regards,\nCompany OS Assistant`;
+  return `Hi,\n\nThank you for your email regarding "${email.subject}".\n\nI've reviewed your message and would be happy to discuss this further.\n\n${instructions ? `Note: ${instructions}\n\n` : ''}Best regards,\nHiveOps Assistant`;
 }
 
 function getHealth() { return { smtp: getSmtpTransport() ? 'configured' : 'not configured', imap: process.env.IMAP_HOST ? 'configured' : 'not configured', imapPolling: !!imapPollInterval }; }

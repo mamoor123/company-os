@@ -43,7 +43,7 @@ jobs:
         env:
           POSTGRES_USER: test
           POSTGRES_PASSWORD: test
-          POSTGRES_DB: company_os_test
+          POSTGRES_DB: hiveops_test
         ports:
           - 5432:5432
         options: >-
@@ -70,14 +70,14 @@ jobs:
         working-directory: server
         run: npm run migrate
         env:
-          DATABASE_URL: postgres://test:test@localhost:5432/company_os_test
+          DATABASE_URL: postgres://test:test@localhost:5432/hiveops_test
           JWT_SECRET: ci-test-secret-pg
 
       - name: Run tests
         working-directory: server
         run: npm test
         env:
-          DATABASE_URL: postgres://test:test@localhost:5432/company_os_test
+          DATABASE_URL: postgres://test:test@localhost:5432/hiveops_test
           JWT_SECRET: ci-test-secret-pg
           NODE_ENV: test
 

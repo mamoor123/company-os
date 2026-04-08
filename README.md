@@ -1,4 +1,4 @@
-# 🏢 Company OS
+# 🐝 HiveOps
 
 AI-Powered Company Operating System — automate and manage entire business operations through intelligent AI agents.
 
@@ -26,7 +26,7 @@ A fully-featured web application with real-time notifications, task management, 
 ## Architecture
 
 ```
-company-os/
+hiveops/
 ├── .github/workflows/ci.yml         # GitHub Actions CI (SQLite + PG + lint)
 ├── server/
 │   ├── __tests__/                   # Jest test suite (58 tests)
@@ -103,7 +103,7 @@ docker-compose up --build
 
 ```bash
 # .env — set DATABASE_URL:
-# DATABASE_URL=postgres://user:pass@localhost:5432/companyos
+# DATABASE_URL=postgres://user:pass@localhost:5432/hiveops
 
 cd server && npm run migrate
 JWT_SECRET=your-secret npm run dev
@@ -279,8 +279,8 @@ NODE_ENV=development
 CORS_ORIGIN=http://localhost:3000
 
 # Database (SQLite default, PostgreSQL optional)
-DB_PATH=./data/company-os.db
-# DATABASE_URL=postgres://user:pass@localhost:5432/companyos
+DB_PATH=./data/hiveops.db
+# DATABASE_URL=postgres://user:pass@localhost:5432/hiveops
 
 # LLM
 LLM_API_URL=https://api.openai.com/v1/chat/completions
@@ -303,9 +303,9 @@ IMAP_PASS=your-app-password
 LOG_LEVEL=info   # trace, debug, info, warn, error, fatal
 
 # PostgreSQL (Docker)
-POSTGRES_USER=companyos
+POSTGRES_USER=hiveops
 POSTGRES_PASSWORD=changeme
-POSTGRES_DB=companyos
+POSTGRES_DB=hiveops
 ```
 
 ## Tech Stack

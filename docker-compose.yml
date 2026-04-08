@@ -4,16 +4,16 @@ services:
   postgres:
     image: postgres:16-alpine
     environment:
-      POSTGRES_USER: ${POSTGRES_USER:-companyos}
+      POSTGRES_USER: ${POSTGRES_USER:-hiveops}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
-      POSTGRES_DB: ${POSTGRES_DB:-companyos}
+      POSTGRES_DB: ${POSTGRES_DB:-hiveops}
     ports:
       - "5432:5432"
     volumes:
       - pg-data:/var/lib/postgresql/data
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-companyos}"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-hiveops}"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -28,7 +28,7 @@ services:
       - CORS_ORIGIN=${CORS_ORIGIN:-http://localhost:3000}
       - PORT=3001
       # PostgreSQL (preferred for production)
-      - DATABASE_URL=postgres://${POSTGRES_USER:-companyos}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-companyos}
+      - DATABASE_URL=postgres://${POSTGRES_USER:-hiveops}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-hiveops}
       # LLM
       - LLM_API_URL=${LLM_API_URL:-https://api.openai.com/v1/chat/completions}
       - LLM_API_KEY=${LLM_API_KEY:-}

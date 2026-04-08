@@ -1,5 +1,5 @@
 {
-  "name": "company-os-server",
+  "name": "hiveops-server",
   "version": "0.4.0",
   "private": true,
   "scripts": {
