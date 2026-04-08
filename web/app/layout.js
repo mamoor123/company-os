@@ -3,6 +3,7 @@ import './globals.css';
 import { AuthProvider, useAuth } from '../lib/auth';
 import { ToastProvider } from '../components/Toast';
 import NotificationBell from '../components/NotificationBell';
+import CommandPalette from '../components/CommandPalette';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useRef } from 'react';
@@ -76,6 +77,13 @@ function Sidebar() {
             <span>{n.icon}</span> {n.label}
           </Link>
         ))}
+        <div style={{ padding: '0.5rem 0.75rem', marginTop: '8px' }}>
+          <kbd style={{
+            background: 'var(--surface-2)', padding: '2px 6px', borderRadius: 4,
+            fontSize: '0.7rem', color: 'var(--text-muted)', border: '1px solid var(--border)',
+          }}>⌘K</kbd>
+          <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginLeft: 6 }}>Search</span>
+        </div>
       </nav>
 
       <div style={{ borderTop: '1px solid var(--border)', paddingTop: '1rem' }}>
@@ -105,6 +113,7 @@ function AppShell({ children }) {
       <main style={{ flex: 1, marginLeft: 240, padding: '2rem', minHeight: '100vh' }}>
         {children}
       </main>
+      <CommandPalette />
     </div>
   );
 }
