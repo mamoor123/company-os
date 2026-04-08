@@ -1,7 +1,8 @@
 /**
  * Test Helper
  *
- * Creates an isolated Express app + SQLite DB for each test suite.
+ * Creates an isolated Express app + database for each test suite.
+ * Supports both SQLite and PostgreSQL (via DATABASE_URL).
  * No Socket.IO, no background services — pure HTTP testing.
  */
 
@@ -9,10 +10,16 @@ const path = require('path');
 const fs = require('fs');
 const os = require('os');
 
-// Set up test env BEFORE requiring any modules
-const testDbPath = path.join(os.tmpdir(), `company-os-test-${Date.now()}-${Math.random().toString(36).slice(2)}.db`);
-process.env.DB_PATH = testDbPath;
-process.env.JWT_SECRET = 'test-secret-key-for-jest';
+const isPg = !!process.env.DATABASE_URL;
+
+// ─── SQLite setup (only when not using PostgreSQL) ───────────────
+let testDbPath;
+if (!isPg) {
+  testDbPath = path.join(os.tmpdir(), `company-os-test-${Date.now()}-${Math.random().toString(36).slice(2)}.db`);
+  process.env.DB_PATH = testDbPath;
+}
+
+process.env.JWT_SECRET = process.env.JWT_SECRET || 'test-secret-key-for-jest';
 process.env.NODE_ENV = 'test';
 process.env.LLM_API_KEY = '';
 // Suppress pino-pretty in tests
@@ -29,6 +36,8 @@ execSync(`node ${path.join(serverRoot, 'src/config/migrate.js')}`, {
 // Now require the app modules
 const express = require('express');
 const db = require('../../src/config/db');
+
+// ─── Helpers ─────────────────────────────────────────────────────
 
 function createTestApp() {
   const app = express();
@@ -70,9 +79,9 @@ async function createAdminUser() {
   return createTestUser({ email: `admin-${Date.now()}-${Math.random().toString(36).slice(2)}@example.com`, name: 'Admin User', role: 'admin' });
 }
 
-function seedDefaults() {
-  const deptCount = db.prepare('SELECT COUNT(*) as count FROM departments').get().count;
-  if (deptCount === 0) {
+async function seedDefaults() {
+  const deptCount = (await db.prepare('SELECT COUNT(*) as count FROM departments').get()).count;
+  if (Number(deptCount) === 0) {
     const defaults = [
       { name: 'Operations', description: 'Day-to-day business operations', icon: '⚙️', color: '#6366f1' },
       { name: 'Marketing', description: 'Marketing, branding, and growth', icon: '📈', color: '#ec4899' },
@@ -82,17 +91,35 @@ function seedDefaults() {
       { name: 'Design', description: 'Creative and visual design', icon: '🎨', color: '#ef4444' },
     ];
     const insert = db.prepare('INSERT INTO departments (name, description, icon, color) VALUES (?, ?, ?, ?)');
-    for (const d of defaults) insert.run(d.name, d.description, d.icon, d.color);
+    for (const d of defaults) await insert.run(d.name, d.description, d.icon, d.color);
   }
 }
 
-function cleanup() {
-  try { db.close(); } catch {}
-  try {
-    fs.unlinkSync(testDbPath);
-    fs.unlinkSync(testDbPath + '-wal');
-    fs.unlinkSync(testDbPath + '-shm');
-  } catch {}
+async function cleanup() {
+  if (isPg) {
+    // PostgreSQL: truncate all tables to isolate test suites
+    const tables = [
+      'notifications', 'workflow_logs', 'task_comments', 'uploads',
+      'emails', 'messages', 'knowledge_base', 'scheduled_tasks',
+      'tasks', 'workflows', 'agents', 'users', 'departments',
+    ];
+    try {
+      for (const table of tables) {
+        await db.prepare(`TRUNCATE TABLE ${table} CASCADE`).run();
+      }
+    } catch (err) {
+      console.error('PG cleanup error:', err.message);
+    }
+    try { await db.close(); } catch {}
+  } else {
+    // SQLite: close and delete temp file
+    try { db.close(); } catch {}
+    try {
+      fs.unlinkSync(testDbPath);
+      fs.unlinkSync(testDbPath + '-wal');
+      fs.unlinkSync(testDbPath + '-shm');
+    } catch {}
+  }
 }
 
 module.exports = { createTestApp, createTestUser, createAdminUser, cleanup, db, seedDefaults };

@@ -7,7 +7,7 @@ let member;
 
 beforeAll(async () => {
   app = createTestApp();
-  seedDefaults();
+  await seedDefaults();
   admin = await createAdminUser();
   member = await createTestUser();
 });
