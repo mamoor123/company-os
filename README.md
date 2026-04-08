@@ -1,331 +1,365 @@
+<div align="center">
+
 # 🐝 HiveOps
 
-AI-Powered Company Operating System — automate and manage entire business operations through intelligent AI agents.
+### AI-Powered Company Operating System
 
-A fully-featured web application with real-time notifications, task management, AI agent execution, knowledge base, email, workflow automation, analytics, file uploads, and an admin system panel.
+*Automate your entire business through intelligent AI agents.*
 
-## What's New
+[![CI](https://github.com/mamoor123/hiveops/actions/workflows/ci.yml/badge.svg)](https://github.com/mamoor123/hiveops/actions/workflows/ci.yml)
+[![Tests](https://img.shields.io/badge/tests-58%20passing-brightgreen)]()
+[![Node](https://img.shields.io/badge/node-18%20|%2020%20|%2022-green)]()
+[![License](https://img.shields.io/badge/license-MIT-blue)]()
 
-### v0.4.0 — PostgreSQL, Logging, CI/CD
+[Quick Start](#-quick-start) · [Features](#-features) · [Architecture](#-architecture) · [API](#-api) · [Contributing](#-contributing)
 
-- **PostgreSQL support** — Dual-mode DB adapter: SQLite by default, PostgreSQL when `DATABASE_URL` is set. Auto-converts queries (placeholders, RETURNING id). Full PG migration schema with SERIAL, TIMESTAMPTZ, JSONB, BOOLEAN types. Docker Compose now uses PostgreSQL 16.
-- **Structured logging** — Pino logger with pretty-print in dev, JSON in production. Auto-redacts sensitive fields (tokens, passwords). Configurable via `LOG_LEVEL`.
-- **CI/CD pipeline** — GitHub Actions: SQLite tests on Node 18/20/22, PostgreSQL tests with PG 16 service container, lint & security audit. Runs on push to main and all PRs.
-- **58 tests passing** across 5 test suites.
+</div>
 
-### v0.3.0 — Production Hardening
+---
 
-- **Testing** — 58 Jest + Supertest tests across 5 test suites
-- **Database Migrations** — Versioned migration system with 30+ performance indexes
-- **Error Recovery** — Retry with exponential backoff, dead letter queue, execution timeouts
-- **Graceful Shutdown** — SIGTERM/SIGINT handlers for clean server stop
-- **Real Email** — Nodemailer SMTP + ImapFlow IMAP, falls back to SQLite-only
-- **Persistent Scheduler** — DB-persisted cron schedules (survive restarts)
-- **DB Hardening** — WAL mode + busy_timeout + 64MB cache + mmap
+HiveOps is a fully-featured company OS with real-time notifications, task management, AI agent execution, knowledge base, email, workflow automation, and an admin panel — all running on a **dual-mode database** (SQLite for dev, PostgreSQL for production).
 
-## Architecture
+> Give each department an AI agent. Set up workflows. Watch it run.
 
-```
-hiveops/
-├── .github/workflows/ci.yml         # GitHub Actions CI (SQLite + PG + lint)
-├── server/
-│   ├── __tests__/                   # Jest test suite (58 tests)
-│   │   ├── helpers/test-helper.js
-│   │   ├── auth.test.js             # 14 tests
-│   │   ├── tasks.test.js            # 13 tests
-│   │   ├── workflows.test.js        #  8 tests
-│   │   ├── ai.test.js               # 11 tests
-│   │   └── departments.test.js      # 12 tests
-│   ├── src/
-│   │   ├── config/
-│   │   │   ├── db.js                # Dual-mode: SQLite + PostgreSQL adapter
-│   │   │   ├── logger.js            # Pino structured logger
-│   │   │   └── migrate.js           # Versioned migration runner (SQLite + PG)
-│   │   ├── middleware/
-│   │   │   ├── auth.js              # JWT auth + role-based access
-│   │   │   ├── rateLimit.js         # Auth endpoint rate limiting
-│   │   │   └── validate.js          # Input validation & sanitization
-│   │   ├── routes/                  # 12 route modules
-│   │   ├── services/
-│   │   │   ├── ai-engine.js         # LLM integration (OpenAI-compatible)
-│   │   │   ├── email-real.js        # Email (SMTP + IMAP + SQLite)
-│   │   │   ├── execution-loop.js    # Auto execution (retry + backoff + DLQ)
-│   │   │   ├── scheduler.js         # Cron scheduler (DB-persisted)
-│   │   │   ├── workflows.js         # Workflow engine
-│   │   │   └── notifications.js     # Socket.IO broadcast
-│   │   └── index.js                 # Entry + Socket.IO + graceful shutdown
-│   ├── jest.config.js
-│   ├── Dockerfile
-│   └── package.json
-├── web/                             # Next.js 14 frontend
-│   ├── app/                         # 12 pages
-│   ├── components/                  # 5 shared components
-│   ├── lib/                         # API client + auth
-│   ├── Dockerfile
-│   └── package.json
-├── docker-compose.yml               # PostgreSQL 16 + server + web
-├── .env.example
-└── README.md
-```
+---
 
-## Quick Start
+## ✨ Features
 
-### 1. Configure environment
+<table>
+<tr>
+<td width="50%">
+
+### 🤖 AI Agents
+- Per-department config with system prompts
+- Auto-execution loop with retry + dead letter queue
+- Agent-to-agent delegation
+- Simulated fallback when no LLM API key
+
+### 📋 Task Management
+- Priority levels (urgent → low) + status tracking
+- Assign to users or AI agents
+- Comments, file attachments, notifications
+- Due dates with retry tracking
+
+### ⚡ Workflow Engine
+- **Triggers:** task_created, task_completed, schedule_daily, user_registered
+- **Conditions:** equals, contains, greater_than, past_due, exists
+- **Actions:** notify, update_task, send_message, create_task
+
+</td>
+<td width="50%">
+
+### 💬 Real-Time Chat
+- Socket.IO with typing indicators
+- Channel-based + direct agent chat
+- Persistent message history
+
+### 📧 Email
+- Inbox / Sent / Drafts / Starred
+- AI-powered draft replies
+- IMAP inbound polling
+- SMTP outbound (Gmail, etc.)
+
+### 📚 Knowledge Base
+- Full-text search + tags
+- Category filtering
+- CRUD with rich content
+
+</td>
+</table>
+
+### 🔐 Security
+
+| Feature | Detail |
+|---------|--------|
+| Authentication | JWT (secret required, no fallback) |
+| Passwords | bcrypt, 10 rounds |
+| Access Control | Role-based: admin, manager, member |
+| Rate Limiting | 20 attempts / 15 min on auth endpoints |
+| HTTP Security | Helmet, CORS, input validation |
+| Logging | Pino structured JSON, auto-redacts secrets |
+
+---
+
+## 🚀 Quick Start
+
+### Option 1: SQLite (zero config)
 
 ```bash
+git clone https://github.com/mamoor123/hiveops.git && cd hiveops
+
+# Setup
 cp .env.example .env
-# JWT_SECRET is required
-openssl rand -base64 32  # generate one
-```
+openssl rand -base64 32  # → paste into JWT_SECRET
 
-### 2. Development (SQLite — no Docker)
-
-```bash
-cd server && npm install
-npm run migrate   # creates DB + tables + indexes
+# Server
+cd server && npm install && npm run migrate
 JWT_SECRET=your-secret npm run dev
 
-# In another terminal:
+# Frontend (new terminal)
 cd web && npm install && npm run dev
 ```
 
-### 3. Production (Docker — PostgreSQL)
+### Option 2: Docker (PostgreSQL)
 
 ```bash
-# .env — set these:
-# JWT_SECRET=your-secret
-# POSTGRES_PASSWORD=changeme
+cp .env.example .env
+# Set JWT_SECRET and POSTGRES_PASSWORD in .env
 
 docker-compose up --build
 ```
 
-### 4. Development (PostgreSQL — local)
+### 📍 Access
 
-```bash
-# .env — set DATABASE_URL:
-# DATABASE_URL=postgres://user:pass@localhost:5432/hiveops
+| Service | URL |
+|---------|-----|
+| Frontend | http://localhost:3000 |
+| API | http://localhost:3001 |
+| Health Check | http://localhost:3001/api/health |
 
-cd server && npm run migrate
-JWT_SECRET=your-secret npm run dev
+---
+
+## 🏗 Architecture
+
+```
+hiveops/
+├── server/                          # Node.js + Express API
+│   ├── src/
+│   │   ├── config/
+│   │   │   ├── db.js                # Dual-mode: SQLite + PostgreSQL
+│   │   │   ├── logger.js            # Pino structured logging
+│   │   │   └── migrate.js           # Versioned migration runner
+│   │   ├── middleware/
+│   │   │   ├── auth.js              # JWT + role-based access
+│   │   │   ├── rateLimit.js         # Brute-force protection
+│   │   │   └── validate.js          # Input sanitization
+│   │   ├── routes/                  # 12 route modules
+│   │   └── services/
+│   │       ├── ai-engine.js         # OpenAI-compatible LLM
+│   │       ├── email-real.js        # SMTP + IMAP
+│   │       ├── execution-loop.js    # Retry + backoff + DLQ
+│   │       ├── scheduler.js         # DB-persisted cron
+│   │       ├── workflows.js         # Rule engine
+│   │       └── notifications.js     # Socket.IO broadcast
+│   └── __tests__/                   # 58 tests (Jest + Supertest)
+│
+├── web/                             # Next.js 14 (App Router)
+│   ├── app/                         # 12 pages
+│   ├── components/                  # Shared UI components
+│   └── lib/                         # API client + auth
+│
+├── docker-compose.yml               # PostgreSQL 16 + server + web
+└── .github/workflows/ci.yml         # CI (SQLite + PG + lint)
 ```
 
-### Access
-- **Frontend:** http://localhost:3000
-- **API:** http://localhost:3001
-- **Health check:** http://localhost:3001/api/health
+### Database
 
-## Testing
+HiveOps uses a **dual-mode adapter** — same API, two backends:
+
+```javascript
+// Works identically on SQLite and PostgreSQL:
+const user = await db.prepare('SELECT * FROM users WHERE id = ?').get(id);
+const tasks = await db.prepare('SELECT * FROM tasks WHERE status = ?').all('pending');
+const result = await db.prepare('INSERT INTO users (...) VALUES (...)').run(...);
+```
+
+| Mode | Trigger | Best for |
+|------|---------|----------|
+| 📦 SQLite | Default | Dev, prototyping, small teams |
+| 🐘 PostgreSQL | `DATABASE_URL` set | Production, scale, JSONB queries |
+
+**14 tables:** users, departments, agents, tasks, task_comments, messages, knowledge_base, workflows, workflow_logs, emails, notifications, uploads, scheduled_tasks, schema_migrations
+
+### Error Recovery
+
+```
+Task fails → retry (10s) → retry (20s) → retry (40s) → dead letter queue
+                                                    ↓
+                                            notify creator
+```
+
+- Exponential backoff (max 3 retries)
+- Configurable execution timeout (default 2 min)
+- Dead letter queue with error details
+- Auto-notifications on failure
+
+---
+
+## 🧪 Testing
 
 ```bash
-cd server && npm test          # 58 tests
+cd server && npm test             # 58 tests
 cd server && npm run test:coverage
 cd server && npm run test:watch
 ```
 
-| Suite | Tests | Coverage |
-|-------|-------|----------|
+| Suite | Tests | What it covers |
+|-------|-------|----------------|
 | `auth.test.js` | 14 | Register, login, profile, password, tokens |
 | `tasks.test.js` | 13 | CRUD, filters, comments, completion |
 | `workflows.test.js` | 8 | CRUD, toggle, triggers, validation |
 | `ai.test.js` | 11 | Chat, execution, delegation, agents |
 | `departments.test.js` | 12 | Departments, knowledge, email |
 
-## CI/CD (GitHub Actions)
+---
 
-Runs on every push to `main` and every PR:
+## 🔌 API
 
-- **SQLite tests** — Node 18, 20, 22
-- **PostgreSQL tests** — Node 20 with PG 16 service container
-- **Lint & security audit**
+<details>
+<summary><b>Auth</b></summary>
 
-## Database
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/api/auth/register` | Create account |
+| POST | `/api/auth/login` | Get JWT token |
+| GET | `/api/auth/me` | Current user profile |
+| PUT | `/api/auth/profile` | Update profile |
+| POST | `/api/auth/change-password` | Change password |
 
-### Dual-Mode Adapter
+</details>
 
-The `db.js` module supports both databases with the same API:
+<details>
+<summary><b>Tasks</b></summary>
 
-| Mode | Trigger | Notes |
-|------|---------|-------|
-| SQLite | Default | File-based, zero config, good for dev/small teams |
-| PostgreSQL | Set `DATABASE_URL` | Production-grade, connection pooling, JSONB |
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/tasks` | List tasks (filterable) |
+| POST | `/api/tasks` | Create task |
+| GET | `/api/tasks/:id` | Task detail |
+| PUT | `/api/tasks/:id` | Update task |
+| DELETE | `/api/tasks/:id` | Delete task |
+| POST | `/api/tasks/:id/comments` | Add comment |
 
-```javascript
-// Same API — works for both:
-const result = await db.prepare('SELECT * FROM users WHERE id = ?').get(id);
-const rows = await db.prepare('SELECT * FROM tasks WHERE status = ?').all('pending');
-const insert = await db.prepare('INSERT INTO users (...) VALUES (...)').run(...);
-// insert.lastInsertRowid works on both SQLite and PG
-```
+</details>
 
-### Migrations
+<details>
+<summary><b>AI Agents</b></summary>
 
-```bash
-cd server && npm run migrate   # runs on startup too
-```
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/agents` | List agents |
+| POST | `/api/agents` | Create agent |
+| POST | `/api/ai/chat/:agentId` | Chat with agent |
+| POST | `/api/ai/execute/:taskId` | Execute task via agent |
 
-| Migration | Description |
-|-----------|-------------|
-| v1 | Initial schema (13 tables) — SQLite + PostgreSQL variants |
-| v2 | Performance indexes (22 indexes on common queries) |
+</details>
 
-### Schema (14 Tables)
+<details>
+<summary><b>Workflows</b></summary>
 
-| Table | Description |
-|-------|-------------|
-| `users` | Authentication, roles, profiles |
-| `departments` | Organizational units |
-| `agents` | AI agent configurations |
-| `tasks` | Task management + retry tracking |
-| `task_comments` | Task activity and agent responses |
-| `messages` | Chat message history |
-| `knowledge_base` | Articles and documentation |
-| `workflows` | Automation rules |
-| `workflow_logs` | Execution history |
-| `emails` | Email storage + IMAP fields |
-| `notifications` | User notifications |
-| `uploads` | File attachment metadata |
-| `scheduled_tasks` | DB-persisted cron schedules |
-| `schema_migrations` | Migration version tracking |
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/workflows` | List workflows |
+| POST | `/api/workflows` | Create workflow |
+| PUT | `/api/workflows/:id` | Update workflow |
+| POST | `/api/workflows/:id/toggle` | Enable/disable |
 
-## Error Recovery
+</details>
 
-- **Retry with exponential backoff** — 10s → 20s → 40s (max 3 retries)
-- **Dead letter queue** — permanently failed tasks with error details
-- **Execution timeout** — configurable, default 2 minutes
-- **Notifications** — creators notified on retry, failure, and dead-letter
+<details>
+<summary><b>Email, Knowledge, Departments, Notifications</b></summary>
 
-## Real Email (SMTP + IMAP)
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/email/inbox` | List inbox |
+| POST | `/api/email/send` | Send email |
+| GET | `/api/knowledge` | List articles |
+| POST | `/api/knowledge/search` | Search articles |
+| GET | `/api/departments` | List departments |
+| GET | `/api/notifications` | List notifications |
 
-```bash
-# Outbound (SMTP) — real sending
-SMTP_HOST=smtp.gmail.com
-SMTP_PORT=587
-SMTP_USER=your-email@gmail.com
-SMTP_PASS=your-app-password
+</details>
 
-# Inbound (IMAP) — polling for new emails
-IMAP_HOST=imap.gmail.com
-IMAP_PORT=993
-IMAP_USER=your-email@gmail.com
-IMAP_PASS=your-app-password
-```
+---
 
-Without SMTP/IMAP config, email stores in SQLite only.
+## ⚙️ Environment Variables
 
-## Features
-
-### 🔐 Security
-- JWT authentication (secret required, no fallback)
-- bcrypt password hashing (10 rounds)
-- Role-based access (admin, manager, member)
-- Auth rate limiting (20 attempts / 15 min)
-- Helmet, CORS, input validation, file type blocking
-
-### 🏢 Departments
-- CRUD with icon, color, description
-- Detail view: members, agents, tasks
-- Admin-only create/delete
-
-### 📋 Tasks
-- Priority (urgent/high/medium/low) + status (pending/in_progress/review/completed/blocked)
-- Assign to users or AI agents, due dates, retry tracking
-- Comments, file attachments, notifications
-
-### 🤖 AI Agents
-- Per-department config, system prompt, model selection
-- Auto-execution loop with retry + backoff + dead letter queue
-- Agent-to-agent delegation
-- Simulated fallback when no LLM API key
-
-### ⚡ Auto-Execution Loop
-- Polls every 30s, max 3 concurrent, priority-ordered
-- Exponential backoff retry, dead letter after max retries
-- Execution timeouts, admin toggle + manual trigger
-
-### ⏰ Cron Scheduler
-- DB-persisted (survives restarts)
-- Daily, weekly, interval schedules
-- Per-schedule agent + priority
-
-### 💬 Real-Time Chat
-- Socket.IO with typing indicators
-- Channel-based, direct agent chat
-- Message history persistence
-
-### 📚 Knowledge Base
-- CRUD, full-text search, tags, category filtering
-
-### 📧 Email
-- Inbox/Sent/Drafts/Starred, compose, reply
-- AI draft replies (LLM when configured)
-- IMAP inbound polling
-
-### ⚡ Workflow Engine
-- Triggers: task_created, task_completed, schedule_daily, user_registered
-- Conditions: equals, contains, greater_than, past_due, exists
-- Actions: notify, update_task, send_message, create_task
-
-### 📈 Analytics, 🔔 Notifications, 🔍 Command Palette, 📎 File Uploads, ⚙️ Admin Panel
-
-## Environment Variables
+<details>
+<summary><b>Full reference</b></summary>
 
 ```bash
-# Required
+# ── Required ──
 JWT_SECRET=your-secret-here
 
-# Server
+# ── Server ──
 PORT=3001
 NODE_ENV=development
 CORS_ORIGIN=http://localhost:3000
 
-# Database (SQLite default, PostgreSQL optional)
-DB_PATH=./data/hiveops.db
-# DATABASE_URL=postgres://user:pass@localhost:5432/hiveops
+# ── Database ──
+DB_PATH=./data/hiveops.db                        # SQLite (default)
+# DATABASE_URL=postgres://user:pass@localhost:5432/hiveops  # PostgreSQL
 
-# LLM
+# ── AI / LLM ──
 LLM_API_URL=https://api.openai.com/v1/chat/completions
 LLM_API_KEY=sk-...
 DEFAULT_MODEL=gpt-4
 
-# SMTP
+# ── SMTP (Outbound) ──
 SMTP_HOST=smtp.gmail.com
 SMTP_PORT=587
 SMTP_USER=your-email@gmail.com
 SMTP_PASS=your-app-password
 
-# IMAP
+# ── IMAP (Inbound) ──
 IMAP_HOST=imap.gmail.com
 IMAP_PORT=993
 IMAP_USER=your-email@gmail.com
 IMAP_PASS=your-app-password
 
-# Logging
-LOG_LEVEL=info   # trace, debug, info, warn, error, fatal
+# ── Logging ──
+LOG_LEVEL=info   # trace | debug | info | warn | error | fatal
 
-# PostgreSQL (Docker)
+# ── PostgreSQL (Docker) ──
 POSTGRES_USER=hiveops
 POSTGRES_PASSWORD=changeme
 POSTGRES_DB=hiveops
 ```
 
-## Tech Stack
+</details>
+
+---
+
+## 🛠 Tech Stack
 
 | Layer | Technology |
 |-------|-----------|
-| Backend | Node.js, Express |
-| Frontend | Next.js 14 (App Router), React 18 |
-| Database | SQLite (default) / PostgreSQL 16 (production) |
-| Migrations | Custom versioned runner (SQLite + PG) |
-| Real-time | Socket.IO |
-| Auth | JWT + bcrypt |
-| Logging | Pino (structured JSON) |
-| AI | OpenAI-compatible API (pluggable) |
-| Email | Nodemailer (SMTP) + ImapFlow (IMAP) |
-| Uploads | Multer |
-| Testing | Jest + Supertest |
-| CI/CD | GitHub Actions |
-| Deploy | Docker, docker-compose |
+| **Backend** | Node.js, Express |
+| **Frontend** | Next.js 14, React 18 |
+| **Database** | SQLite / PostgreSQL 16 |
+| **Real-time** | Socket.IO |
+| **Auth** | JWT + bcrypt |
+| **Logging** | Pino |
+| **AI** | OpenAI-compatible API |
+| **Email** | Nodemailer + ImapFlow |
+| **Testing** | Jest + Supertest |
+| **CI/CD** | GitHub Actions |
+| **Deploy** | Docker, docker-compose |
 
-## License
+---
 
-MIT
+## 🤝 Contributing
+
+```bash
+# Fork & clone
+git clone https://github.com/mamoor123/hiveops.git
+
+# Create feature branch
+git checkout -b feature/your-idea
+
+# Make changes, test
+cd server && npm test
+
+# Push & open PR
+git push origin feature/your-idea
+```
+
+---
+
+<div align="center">
+
+**[⬆ back to top](#-hiveops)**
+
+Made with 🐝 by [mamoor123](https://github.com/mamoor123)
+
+</div>
