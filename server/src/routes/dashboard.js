@@ -11,7 +11,8 @@ const { authMiddleware } = require('../middleware/auth');
 const router = express.Router();
 
 router.get('/', authMiddleware, async (req, res) => {
-  const [departments, users, agents, activeTasks, urgentTasks, recentTasks, recentNotifications] = await Promise.all([
+  try {
+    const [departments, users, agents, activeTasks, urgentTasks, recentTasks, recentNotifications] = await Promise.all([
     db.prepare('SELECT COUNT(*) as count FROM departments').get(),
     db.prepare('SELECT COUNT(*) as count FROM users').get(),
     db.prepare('SELECT COUNT(*) as count FROM agents').get(),
@@ -24,7 +25,10 @@ router.get('/', authMiddleware, async (req, res) => {
     stats: { departments: departments.count, users: users.count, agents: agents.count, activeTasks: activeTasks.count, urgentTasks: urgentTasks.count },
     recentTasks,
     recentNotifications,
-  });
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 router.get('/activity', authMiddleware, async (req, res) => {

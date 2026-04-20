@@ -55,6 +55,10 @@ router.delete('/:id', authMiddleware, adminOnly, async (req, res) => {
 
 // Manually trigger a workflow
 router.post('/trigger/:trigger', authMiddleware, async (req, res) => {
+  const ALLOWED_TRIGGERS = ['task_created', 'task_completed', 'task_updated', 'user_registered', 'schedule_daily'];
+  if (!ALLOWED_TRIGGERS.includes(req.params.trigger)) {
+    return res.status(400).json({ error: `Unknown trigger: ${req.params.trigger}. Allowed: ${ALLOWED_TRIGGERS.join(', ')}` });
+  }
   const results = await workflowService.processTrigger(req.params.trigger, req.body.context || {});
   res.json({ triggered: results.length, results });
 });

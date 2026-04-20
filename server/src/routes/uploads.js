@@ -38,7 +38,7 @@ router.get('/task/:taskId', authMiddleware, async (req, res) => {
   res.json(await db.prepare('SELECT u.*, usr.name as uploader_name FROM uploads u LEFT JOIN users usr ON u.uploaded_by = usr.id WHERE u.task_id = ? ORDER BY u.created_at DESC').all(req.params.taskId));
 });
 
-router.get('/:id/download', async (req, res) => {
+router.get('/:id/download', authMiddleware, async (req, res) => {
   const file = await db.prepare('SELECT * FROM uploads WHERE id = ?').get(req.params.id);
   if (!file) return res.status(404).json({ error: 'File not found' });
   res.download(file.path, file.original_name);

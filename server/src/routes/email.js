@@ -10,17 +10,7 @@ const emailService = require('../services/email-real');
 
 const router = express.Router();
 
-// Get emails by folder
-router.get('/:folder', authMiddleware, async (req, res) => {
-  const { unread, starred, label, search } = req.query;
-  const emails = await emailService.getEmails(req.params.folder, {
-    unreadOnly: unread === 'true',
-    starred: starred === 'true',
-    label,
-    search,
-  });
-  res.json(emails);
-});
+// Specific routes FIRST (before /:folder catches everything)
 
 // Get stats
 router.get('/meta/stats', authMiddleware, async (req, res) => {
@@ -86,6 +76,18 @@ router.post('/:id/draft-reply', authMiddleware, async (req, res) => {
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
+});
+
+// Get emails by folder — MUST be last (catches /inbox, /sent, etc.)
+router.get('/:folder', authMiddleware, async (req, res) => {
+  const { unread, starred, label, search } = req.query;
+  const emails = await emailService.getEmails(req.params.folder, {
+    unreadOnly: unread === 'true',
+    starred: starred === 'true',
+    label,
+    search,
+  });
+  res.json(emails);
 });
 
 module.exports = router;
