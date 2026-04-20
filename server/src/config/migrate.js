@@ -17,10 +17,10 @@ const DATABASE_URL = process.env.DATABASE_URL;
 // ─── Migration definitions ───────────────────────────────────────
 
 const migrations = [
-  {
-    version: 1,
-    name: 'initial_schema',
-    sqlite: `
+	{
+		version: 1,
+		name: "initial_schema",
+		sqlite: `
       CREATE TABLE IF NOT EXISTS users (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         email TEXT UNIQUE NOT NULL,
@@ -203,7 +203,7 @@ const migrations = [
         applied_at DATETIME DEFAULT CURRENT_TIMESTAMP
       );
     `,
-    postgres: `
+		postgres: `
       CREATE TABLE IF NOT EXISTS departments (
         id SERIAL PRIMARY KEY,
         name TEXT UNIQUE NOT NULL,
@@ -366,11 +366,11 @@ const migrations = [
         applied_at TIMESTAMPTZ DEFAULT NOW()
       );
     `,
-  },
-  {
-    version: 2,
-    name: 'add_performance_indexes',
-    sqlite: `
+	},
+	{
+		version: 2,
+		name: "add_performance_indexes",
+		sqlite: `
       CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks(status);
       CREATE INDEX IF NOT EXISTS idx_tasks_priority ON tasks(priority);
       CREATE INDEX IF NOT EXISTS idx_tasks_department ON tasks(department_id);
@@ -394,7 +394,7 @@ const migrations = [
       CREATE INDEX IF NOT EXISTS idx_scheduled_tasks_next_run ON scheduled_tasks(next_run);
       CREATE INDEX IF NOT EXISTS idx_emails_message_id ON emails(message_id);
     `,
-    postgres: `
+		postgres: `
       CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks(status);
       CREATE INDEX IF NOT EXISTS idx_tasks_priority ON tasks(priority);
       CREATE INDEX IF NOT EXISTS idx_tasks_department ON tasks(department_id);
@@ -418,95 +418,131 @@ const migrations = [
       CREATE INDEX IF NOT EXISTS idx_scheduled_tasks_next_run ON scheduled_tasks(next_run);
       CREATE INDEX IF NOT EXISTS idx_emails_message_id ON emails(message_id);
     `,
-  },
+	},
 ];
 
 // ─── Runner ──────────────────────────────────────────────────────
 
 async function runMigrations() {
-  if (DATABASE_URL) {
-    await runPgMigrations();
-  } else {
-    runSqliteMigrations();
-  }
+	if (DATABASE_URL) {
+		await runPgMigrations();
+	} else {
+		runSqliteMigrations();
+	}
 }
 
 function runSqliteMigrations() {
-  const Database = require('better-sqlite3');
-  const path = require('path');
-  const fs = require('fs');
-  const DB_PATH = process.env.DB_PATH || path.join(__dirname, '../../data/company-os.db');
-  const dbDir = path.dirname(DB_PATH);
-  if (!fs.existsSync(dbDir)) fs.mkdirSync(dbDir, { recursive: true });
-  const db = new Database(DB_PATH);
-  db.pragma('journal_mode = WAL');
-  db.pragma('foreign_keys = ON');
+	const Database = require("better-sqlite3");
+	const path = require("node:path");
+	const fs = require("node:fs");
+	const DB_PATH =
+		process.env.DB_PATH || path.join(__dirname, "../../data/company-os.db");
+	const dbDir = path.dirname(DB_PATH);
+	if (!fs.existsSync(dbDir)) fs.mkdirSync(dbDir, { recursive: true });
+	const db = new Database(DB_PATH);
+	db.pragma("journal_mode = WAL");
+	db.pragma("foreign_keys = ON");
 
-  db.exec('CREATE TABLE IF NOT EXISTS schema_migrations (version INTEGER PRIMARY KEY, name TEXT NOT NULL, applied_at DATETIME DEFAULT CURRENT_TIMESTAMP)');
-  const applied = new Set(db.prepare('SELECT version FROM schema_migrations').all().map(r => r.version));
+	db.exec(
+		"CREATE TABLE IF NOT EXISTS schema_migrations (version INTEGER PRIMARY KEY, name TEXT NOT NULL, applied_at DATETIME DEFAULT CURRENT_TIMESTAMP)",
+	);
+	const applied = new Set(
+		db
+			.prepare("SELECT version FROM schema_migrations")
+			.all()
+			.map((r) => r.version),
+	);
 
-  let ran = 0;
-  for (const m of migrations) {
-    if (applied.has(m.version)) continue;
-    console.log(`  ↑ Migration ${m.version}: ${m.name}`);
-    try {
-      db.exec(m.sqlite);
-      db.prepare('INSERT INTO schema_migrations (version, name) VALUES (?, ?)').run(m.version, m.name);
-      ran++;
-    } catch (err) {
-      if (err.message.includes('duplicate column name')) {
-        db.prepare('INSERT OR IGNORE INTO schema_migrations (version, name) VALUES (?, ?)').run(m.version, m.name);
-        ran++;
-      } else throw err;
-    }
-  }
-  console.log(ran === 0 ? '✅ All migrations already applied' : `✅ Applied ${ran} migration(s)`);
-  db.close();
+	let ran = 0;
+	for (const m of migrations) {
+		if (applied.has(m.version)) continue;
+		console.log(`  ↑ Migration ${m.version}: ${m.name}`);
+		try {
+			db.exec(m.sqlite);
+			db.prepare(
+				"INSERT INTO schema_migrations (version, name) VALUES (?, ?)",
+			).run(m.version, m.name);
+			ran++;
+		} catch (err) {
+			if (err.message.includes("duplicate column name")) {
+				db.prepare(
+					"INSERT OR IGNORE INTO schema_migrations (version, name) VALUES (?, ?)",
+				).run(m.version, m.name);
+				ran++;
+			} else throw err;
+		}
+	}
+	console.log(
+		ran === 0
+			? "✅ All migrations already applied"
+			: `✅ Applied ${ran} migration(s)`,
+	);
+	db.close();
 }
 
 async function runPgMigrations() {
-  const { Pool } = require('pg');
-  const pool = new Pool({ connectionString: DATABASE_URL });
+	const { Pool } = require("pg");
+	const pool = new Pool({ connectionString: DATABASE_URL });
 
-  const client = await pool.connect();
-  try {
-    await client.query('CREATE TABLE IF NOT EXISTS schema_migrations (version INTEGER PRIMARY KEY, name TEXT NOT NULL, applied_at TIMESTAMPTZ DEFAULT NOW())');
-    const { rows } = await client.query('SELECT version FROM schema_migrations');
-    const applied = new Set(rows.map(r => r.version));
+	const client = await pool.connect();
+	try {
+		await client.query(
+			"CREATE TABLE IF NOT EXISTS schema_migrations (version INTEGER PRIMARY KEY, name TEXT NOT NULL, applied_at TIMESTAMPTZ DEFAULT NOW())",
+		);
+		const { rows } = await client.query(
+			"SELECT version FROM schema_migrations",
+		);
+		const applied = new Set(rows.map((r) => r.version));
 
-    let ran = 0;
-    for (const m of migrations) {
-      if (applied.has(m.version)) continue;
-      console.log(`  ↑ Migration ${m.version}: ${m.name}`);
-      // Split PostgreSQL SQL into individual statements
-      const statements = m.postgres.split(/;\s*\n/).map(s => s.trim()).filter(s => s.length > 0);
-      await client.query('BEGIN');
-      try {
-        for (const stmt of statements) {
-          await client.query(stmt);
-        }
-        await client.query('INSERT INTO schema_migrations (version, name) VALUES ($1, $2)', [m.version, m.name]);
-        await client.query('COMMIT');
-        ran++;
-      } catch (err) {
-        await client.query('ROLLBACK');
-        if (err.message.includes('already exists')) {
-          await client.query('INSERT INTO schema_migrations (version, name) VALUES ($1, $2) ON CONFLICT DO NOTHING', [m.version, m.name]);
-          ran++;
-        } else throw err;
-      }
-    }
-    console.log(ran === 0 ? '✅ All PostgreSQL migrations already applied' : `✅ Applied ${ran} PostgreSQL migration(s)`);
-  } finally {
-    client.release();
-    await pool.end();
-  }
+		let ran = 0;
+		for (const m of migrations) {
+			if (applied.has(m.version)) continue;
+			console.log(`  ↑ Migration ${m.version}: ${m.name}`);
+			// Split PostgreSQL SQL into individual statements
+			const statements = m.postgres
+				.split(/;\s*\n/)
+				.map((s) => s.trim())
+				.filter((s) => s.length > 0);
+			await client.query("BEGIN");
+			try {
+				for (const stmt of statements) {
+					await client.query(stmt);
+				}
+				await client.query(
+					"INSERT INTO schema_migrations (version, name) VALUES ($1, $2)",
+					[m.version, m.name],
+				);
+				await client.query("COMMIT");
+				ran++;
+			} catch (err) {
+				await client.query("ROLLBACK");
+				if (err.message.includes("already exists")) {
+					await client.query(
+						"INSERT INTO schema_migrations (version, name) VALUES ($1, $2) ON CONFLICT DO NOTHING",
+						[m.version, m.name],
+					);
+					ran++;
+				} else throw err;
+			}
+		}
+		console.log(
+			ran === 0
+				? "✅ All PostgreSQL migrations already applied"
+				: `✅ Applied ${ran} PostgreSQL migration(s)`,
+		);
+	} finally {
+		client.release();
+		await pool.end();
+	}
 }
 
 // ─── CLI entry point ─────────────────────────────────────────────
 
 if (require.main === module) {
-  runMigrations().catch(err => { console.error('❌ Migration failed:', err.message); process.exit(1); });
+	runMigrations().catch((err) => {
+		console.error("❌ Migration failed:", err.message);
+		process.exit(1);
+	});
 }
 
 module.exports = { runMigrations };

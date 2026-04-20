@@ -15,25 +15,40 @@
  *   log.debug({ userId: 42 }, 'User action');
  */
 
-const pino = require('pino');
+const pino = require("pino");
 
-const isDev = process.env.NODE_ENV !== 'production';
+const isDev = process.env.NODE_ENV !== "production";
 
 const logger = pino({
-  level: process.env.LOG_LEVEL || (isDev ? 'debug' : 'info'),
-  transport: isDev
-    ? { target: 'pino-pretty', options: { colorize: true, translateTime: 'SYS:HH:MM:ss', ignore: 'pid,hostname' } }
-    : undefined,
-  formatters: {
-    level(label) {
-      return { level: label };
-    },
-  },
-  timestamp: pino.stdTimeFunctions.isoTime,
-  redact: {
-    paths: ['req.headers.authorization', 'password', 'password_hash', 'token', 'apiKey', 'api_key', 'secret'],
-    censor: '[REDACTED]',
-  },
+	level: process.env.LOG_LEVEL || (isDev ? "debug" : "info"),
+	transport: isDev
+		? {
+				target: "pino-pretty",
+				options: {
+					colorize: true,
+					translateTime: "SYS:HH:MM:ss",
+					ignore: "pid,hostname",
+				},
+			}
+		: undefined,
+	formatters: {
+		level(label) {
+			return { level: label };
+		},
+	},
+	timestamp: pino.stdTimeFunctions.isoTime,
+	redact: {
+		paths: [
+			"req.headers.authorization",
+			"password",
+			"password_hash",
+			"token",
+			"apiKey",
+			"api_key",
+			"secret",
+		],
+		censor: "[REDACTED]",
+	},
 });
 
 module.exports = logger;
