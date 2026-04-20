@@ -106,7 +106,10 @@ async function executeActions(actions, context) {
       switch (action.type) {
         case 'notify': results.push({ type: 'notify', target: action.target, message, success: true }); break;
         case 'update_task':
-          if (context.taskId) { await db.prepare(`UPDATE tasks SET ${action.field} = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`).run(action.value, context.taskId); results.push({ type: 'update_task', field: action.field, value: action.value, success: true }); } break;
+          if (context.taskId) {
+            const ALLOWED_FIELDS = ['status', 'priority', 'title', 'description', 'assigned_to', 'due_date'];
+            if (!ALLOWED_FIELDS.includes(action.field)) { results.push({ type: 'update_task', success: false, error: `Invalid field: ${action.field}` }); break; }
+            await db.prepare(`UPDATE tasks SET ${action.field} = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`).run(action.value, context.taskId); results.push({ type: 'update_task', field: action.field, value: action.value, success: true }); } break;
         case 'send_message': await db.prepare("INSERT INTO messages (channel, sender_type, sender_id, content) VALUES (?, 'agent', 0, ?)").run(action.channel || 'general', message); results.push({ type: 'send_message', channel: action.channel, success: true }); break;
         case 'create_task': await db.prepare("INSERT INTO tasks (title, description, priority, department_id, created_by) VALUES (?, ?, ?, ?, 1)").run(message, action.description || '', action.priority || 'medium', action.department_id || null); results.push({ type: 'create_task', success: true }); break;
         default: results.push({ type: action.type, success: false, error: 'Unknown action' });
@@ -117,6 +120,8 @@ async function executeActions(actions, context) {
 }
 
 async function processTrigger(triggerName, context = {}) {
+  const ALLOWED_TRIGGERS = ['task_created', 'task_completed', 'task_updated', 'user_registered', 'schedule_daily'];
+  if (!ALLOWED_TRIGGERS.includes(triggerName)) return [];
   const rows = await db.prepare('SELECT * FROM workflows WHERE enabled = true AND "trigger" = ?').all(triggerName);
   const matchedWorkflows = rows.map(rowToWorkflow);
   const results = [];
